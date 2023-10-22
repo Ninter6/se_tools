@@ -209,7 +209,7 @@ public:
      * 这是一个可以添加任意option的模版函数
      * 如果你要添加option或value_option, 请以`名称``短名``帮助`的顺序输入
      */
-    template <class T = option, class...Args>
+    template <class T, class...Args>
     typename std::enable_if<std::is_base_of<option, T>::value || std::is_same<option, T>::value, ArgParser&>::type
     AddOption(Args...args) {
         options.push_back(std::make_unique<T>(std::forward<Args...>(args)...));
