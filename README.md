@@ -2,10 +2,10 @@
 The simpliest easiest toolbox
 
 # Overview
-- seargs
-- sebase64
-- secompress
-- seformat
-- sejson
-- setimer
-- [] seargs
+- [x] seargs
+- [x] sebase64
+- [x] secompress
+- [x] seformat
+- [x] sejson
+- [x] setimer
+- [ ] seranges
