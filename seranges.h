@@ -2,8 +2,10 @@
  * @Author: Ninter6 mc525740@outlook.com
  * @Date: 2023-10-15 01:39:42
  * @LastEditors: Ninter6
- * @LastEditTime: 2023-10-22 13:22:47
+ * @LastEditTime: 2023-10-28 22:00:33
  */
+#pragma once
+
 #include <ranges>
 #include <iterator>
 #include <utility>
