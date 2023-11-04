@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 #include <sstream>
+#include <variant>
 #include <unordered_map>
 
 namespace st {
@@ -33,13 +34,14 @@ public:
         JSON_NULL
     };
 
-    struct Value {
-        JsonObjectPtr_t value_object;
-        JsonArrayPtr_t value_array;
-        std::string value_string;
-        double value_number;
-        bool value_bool;
-    };
+    // struct Value {
+    //     JsonObjectPtr_t value_object;
+    //     JsonArrayPtr_t value_array;
+    //     std::string value_string;
+    //     double value_number;
+    //     bool value_bool;
+    // };
+    using Value_t = std::variant<JsonObjectPtr_t, JsonArrayPtr_t, std::string, double, bool>;
     
     JsonElement() = default;
 
@@ -56,7 +58,7 @@ public:
         value(value_string);
     }
     JsonElement(long value_number) {
-        value((double)value_number);
+        value(static_cast<double>(value_number));
     }
     JsonElement(double value_number) {
         value(value_number);
@@ -67,44 +69,44 @@ public:
     
     void value(JsonObjectPtr_t value_object) {
         type = Type::JSON_OBJECT;
-        val.value_object = value_object;
+        val= value_object;
     }
     void value(JsonArrayPtr_t value_array) {
         type = Type::JSON_ARRAY;
-        val.value_array = value_array;
+        val = value_array;
     }
     void value(const std::string& value_string) {
         type = Type::JSON_STRING;
-        val.value_string = value_string;
+        val = value_string;
     }
     void value(double value_number) {
         type = Type::JSON_NUMBER;
-        val.value_number = value_number;
+        val = value_number;
     }
     void value(bool value_bool) {
         type = Type::JSON_BOOL;
-        val.value_bool = value_bool;
+        val = value_bool;
     }
 
     JsonObjectPtr_t AsObject() const {
         if (type != Type::JSON_OBJECT) ERROR("Type of JsonElement isn't JsonObject!");
-        return val.value_object;
+        return std::get<JsonObjectPtr_t>(val);
     }
     JsonArrayPtr_t AsArray() const {
         if (type != Type::JSON_ARRAY) ERROR("Type of JsonElement isn't JsonArray!");
-        return val.value_array;
+        return std::get<JsonArrayPtr_t>(val);
     }
     std::string AsString() const {
         if (type != Type::JSON_STRING) ERROR("Type of JsonElement isn't String!");
-        return val.value_string;
+        return std::get<std::string>(val);
     }
     double AsNumber() const {
         if (type != Type::JSON_NUMBER) ERROR("Type of JsonElement isn't Number!");
-        return val.value_number;
+        return std::get<double>(val);
     }
     bool AsBool() const {
         if (type != Type::JSON_BOOL) ERROR("Type of JsonElement isn't Boolean!");
-        return val.value_bool;
+        return std::get<bool>(val);
     }
     
     Type GetType() const {
@@ -115,19 +117,19 @@ public:
       std::stringstream ss;
       switch (type) {
         case Type::JSON_OBJECT:
-          ss << *(val.value_object);
+          ss << *(std::get<JsonObjectPtr_t>(val));
           break;
         case Type::JSON_ARRAY:
-          ss << *(val.value_array);
+          ss << *(std::get<JsonArrayPtr_t>(val));
           break;
         case Type::JSON_STRING:
-          ss << '"' << val.value_string << '"';
+          ss << '"' << std::get<std::string>(val) << '"';
           break;
         case Type::JSON_NUMBER:
-          ss << val.value_number;
+          ss << std::get<double>(val);
           break;
         case Type::JSON_BOOL:
-          ss << std::boolalpha << val.value_bool;
+          ss << std::boolalpha << std::get<bool>(val);
           break;
         case Type::JSON_NULL:
           ss << "null";
@@ -162,7 +164,7 @@ public:
 
 private:
     Type type = Type::JSON_NULL;
-    Value val;
+    Value_t val;
 
 };
 
