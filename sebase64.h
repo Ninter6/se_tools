@@ -66,7 +66,7 @@ inline std::string decode(const std::string& input) {
 namespace base58 {
 
 // Base58字符集
-std::string base58Chars =
+static const std::string base58Chars = 
     "123456789"
     "ABCDEFGHJKLMNPQRSTUVWXYZ"
     "abcdefghijkmnopqrstuvwxyz";
@@ -94,7 +94,7 @@ inline std::string decode(const std::string& input) {
         int cur = mp[input[i]];
         for (int j = 0; j < tmp.size(); j++)
             tmp[j] = (cur += tmp[j] * 58) & 0xFF, cur >>= 8;
-        while (cur) tmp.push_back(cur & 0xFF), cur >>= 8;
+        while (cur)tmp.push_back(cur & 0xFF), cur >>= 8;
     }
     return {tmp.rbegin(), tmp.rend()};
 }
@@ -103,7 +103,7 @@ inline std::string decode(const std::string& input) {
 
 namespace 原神 {
 
-static std::string 原神启动[] = {"原", "神", "启", "动"};
+static const std::string 原神启动[] = {"原", "神", "启", "动"};
 
 inline std::string encode(const std::string& input) {
     std::string encoded;
@@ -123,6 +123,42 @@ inline std::string decode(const std::string& input) {
         const auto& c = input.substr(i, 3);
         for (int j = 0; j < 4; j++)
             if (c == 原神启动[j]) {
+                b = (b << 2) | j;
+                if (++n == 4) {
+                    decoded.push_back(b);
+                    b = n = 0;
+                }
+                break;
+            }
+    }
+
+    return decoded;
+}
+
+}
+
+namespace ikun {
+
+static const std::string kunChars[] = {"鸡", "你", "太", "美"};
+
+inline std::string encode(const std::string& input) {
+    std::string encoded;
+
+    for (auto c : input)
+        for (int i = 3; i >= 0; i--)
+            encoded.insert(encoded.size(), kunChars[(c >> i*2) & 3]);
+
+    return encoded;
+}
+
+inline std::string decode(const std::string& input) {
+    std::string decoded;
+    uint8_t b = 0, n = 0;
+
+    for (int i = 0; i < input.size(); i += 3) {
+        const auto& c = input.substr(i, 3);
+        for (int j = 0; j < 4; j++)
+            if (c == kunChars[j]) {
                 b = (b << 2) | j;
                 if (++n == 4) {
                     decoded.push_back(b);
