@@ -110,17 +110,17 @@ struct named_argument : public argument {
     named_argument(const std::string& name, const std::string& help) : argument(name, help) {}
 };
 
-std::string s2v(const std::string& str) {return str;}
+static const std::string& s2v(const std::string& str) {return str;}
 
 template<class T>
-T s2v(const std::string& str) {
+static T s2v(const std::string& str) {
     std::istringstream os{str};
     T t;
     os >> t;
     return t;
 }
 
-std::string str_replace(const std::string &str, const std::string &from, const std::string &to) {
+inline std::string str_replace(const std::string &str, const std::string &from, const std::string &to) {
     std::string ret;
     std::size_t pos = 0, pre_pos = 0;
     while ((pos = str.find(from, pre_pos)) != std::string::npos) {

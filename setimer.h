@@ -1,3 +1,9 @@
+/*
+ * @Author: Ninter6 mc525740@outlook.com
+ * @Date: 2023-08-22 16:35:10
+ * @LastEditors: Ninter6
+ * @LastEditTime: 2024-01-14 12:11:15
+ */
 #pragma once
 
 #include <chrono>
@@ -6,6 +12,8 @@ namespace st {
 
 class Timer {
 public:
+    using time_point = std::chrono::high_resolution_clock::time_point;
+
     Timer() = default;
 
     auto Start() {
@@ -32,28 +40,30 @@ public:
     }
 
 private:
-    std::chrono::high_resolution_clock::time_point startTime, lastTick, breakpoint;
+    time_point startTime, lastTick, breakpoint;
 };
 
 class Countdown : public Timer {
 public:
+    using duration = std::chrono::duration<double, std::chrono::seconds::period>;
+
     Countdown() = default;
-    Countdown(double seconds) : seconds(seconds) {}
+    Countdown(duration seconds) : seconds(seconds) {}
 
     bool IsTimeOut() {
         return Total() >= seconds;
     }
 
-    void Reset(double seconds) {
-        this->seconds = std::chrono::duration<double, std::chrono::seconds::period>(seconds);
+    void Reset(duration seconds) {
+        this->seconds = seconds;
     }
 
     auto Remainder() {
-        return std::chrono::duration<double, std::chrono::seconds::period>(seconds - Total());
+        return duration(seconds - Total());
     }
 
 private:
-    std::chrono::duration<double, std::chrono::seconds::period> seconds;
+    duration seconds;
 };
 
 }

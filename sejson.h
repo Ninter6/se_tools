@@ -13,15 +13,8 @@ namespace st {
 #define ERROR(s) do{throw std::logic_error(s);}while(0)
 
 class JsonElement;
-
-using JsonElementPtr_t = std::shared_ptr<JsonElement>;
-
-using JsonObject = std::unordered_map<std::string, JsonElementPtr_t>;
-
-using JsonArray = std::vector<JsonElementPtr_t>;
-
-using JsonObjectPtr_t = std::shared_ptr<JsonObject>;
-using JsonArrayPtr_t = std::shared_ptr<JsonArray>;
+using JsonObject = std::unordered_map<std::string, JsonElement>;
+using JsonArray = std::vector<JsonElement>;
 
 class JsonElement {
 public:
@@ -34,21 +27,14 @@ public:
         JSON_NULL
     };
 
-    // struct Value {
-    //     JsonObjectPtr_t value_object;
-    //     JsonArrayPtr_t value_array;
-    //     std::string value_string;
-    //     double value_number;
-    //     bool value_bool;
-    // };
-    using Value_t = std::variant<JsonObjectPtr_t, JsonArrayPtr_t, std::string, double, bool>;
+    using Value_t = std::variant<JsonObject, JsonArray, std::string, double, bool>;
     
     JsonElement() = default;
 
-    JsonElement(JsonObjectPtr_t value_object) {
+    JsonElement(JsonObject value_object) {
         value(value_object);
     }
-    JsonElement(JsonArrayPtr_t value_array) {
+    JsonElement(JsonArray value_array) {
         value(value_array);
     }
     JsonElement(const char* value_string) {
@@ -57,21 +43,19 @@ public:
     JsonElement(const std::string& value_string) {
         value(value_string);
     }
-    JsonElement(long value_number) {
+    template <class T, class = std::enable_if_t<std::is_arithmetic_v<T>>>
+    JsonElement(T value_number) {
         value(static_cast<double>(value_number));
-    }
-    JsonElement(double value_number) {
-        value(value_number);
     }
     JsonElement(bool value_bool) {
         value(value_bool);
     }
     
-    void value(JsonObjectPtr_t value_object) {
+    void value(const JsonObject& value_object) {
         type = Type::JSON_OBJECT;
         val= value_object;
     }
-    void value(JsonArrayPtr_t value_array) {
+    void value(const JsonArray& value_array) {
         type = Type::JSON_ARRAY;
         val = value_array;
     }
@@ -88,23 +72,44 @@ public:
         val = value_bool;
     }
 
-    JsonObjectPtr_t AsObject() const {
+    JsonObject& AsObject() {
         if (type != Type::JSON_OBJECT) ERROR("Type of JsonElement isn't JsonObject!");
-        return std::get<JsonObjectPtr_t>(val);
+        return std::get<JsonObject>(val);
     }
-    JsonArrayPtr_t AsArray() const {
+    JsonArray& AsArray() {
         if (type != Type::JSON_ARRAY) ERROR("Type of JsonElement isn't JsonArray!");
-        return std::get<JsonArrayPtr_t>(val);
+        return std::get<JsonArray>(val);
     }
-    std::string AsString() const {
+    std::string& AsString() {
         if (type != Type::JSON_STRING) ERROR("Type of JsonElement isn't String!");
         return std::get<std::string>(val);
     }
-    double AsNumber() const {
+    double& AsNumber() {
         if (type != Type::JSON_NUMBER) ERROR("Type of JsonElement isn't Number!");
         return std::get<double>(val);
     }
-    bool AsBool() const {
+    bool& AsBool() {
+        if (type != Type::JSON_BOOL) ERROR("Type of JsonElement isn't Boolean!");
+        return std::get<bool>(val);
+    }
+
+    const JsonObject& AsObject() const {
+        if (type != Type::JSON_OBJECT) ERROR("Type of JsonElement isn't JsonObject!");
+        return std::get<JsonObject>(val);
+    }
+    const JsonArray& AsArray() const {
+        if (type != Type::JSON_ARRAY) ERROR("Type of JsonElement isn't JsonArray!");
+        return std::get<JsonArray>(val);
+    }
+    const std::string& AsString() const {
+        if (type != Type::JSON_STRING) ERROR("Type of JsonElement isn't String!");
+        return std::get<std::string>(val);
+    }
+    const double& AsNumber() const {
+        if (type != Type::JSON_NUMBER) ERROR("Type of JsonElement isn't Number!");
+        return std::get<double>(val);
+    }
+    const bool& AsBool() const {
         if (type != Type::JSON_BOOL) ERROR("Type of JsonElement isn't Boolean!");
         return std::get<bool>(val);
     }
@@ -117,10 +122,10 @@ public:
       std::stringstream ss;
       switch (type) {
         case Type::JSON_OBJECT:
-          ss << *(std::get<JsonObjectPtr_t>(val));
+          ss << std::get<JsonObject>(val);
           break;
         case Type::JSON_ARRAY:
-          ss << *(std::get<JsonArrayPtr_t>(val));
+          ss << std::get<JsonArray>(val);
           break;
         case Type::JSON_STRING:
           ss << '"' << std::get<std::string>(val) << '"';
@@ -141,7 +146,7 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const JsonObject& object) {
       os << "{";
       for (auto iter = object.begin(); iter != object.end(); iter++) {
-        os << '\"' << iter->first << '\"' << ": " << iter->second->Dumps();
+        os << '\"' << iter->first << '\"' << ": " << iter->second.Dumps();
         if (std::next(iter) != object.end()) {
           os << ", ";
         }
@@ -153,7 +158,7 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const JsonArray& array) {
       os << "[";
       for (size_t i = 0; i < array.size(); i++) {
-        os << array[i]->Dumps();
+        os << array[i].Dumps();
         if (i != array.size() - 1) {
           os << ", ";
         }
@@ -168,10 +173,10 @@ private:
 
 };
 
-class Scanner {
+class JsonScanner {
 public:
-    Scanner() = default;
-    Scanner(const std::string& source) : src(source) {}
+    JsonScanner() = default;
+    JsonScanner(const std::string& source) : src(source) {}
     
     enum class JsonTokenType {
         BEGIN_OBJECT, // {
@@ -305,11 +310,16 @@ private:
     void ScanNumber() {
         auto pos = current - 1;
         
-        bool dotflag = true;
+        bool dotflag = true, eflag = true;
         
-        while (std::isdigit(Peek()) || (Peek() == '.' && dotflag)) {
+        while (std::isdigit(Peek()) ||
+               (Peek() == '.' && dotflag) ||
+               ((Peek() == 'e' || Peek() == 'E') && eflag)) {
             if (Peek() == '.') {
                 dotflag = false;
+            } else if (Peek() == 'e' || Peek() == 'E') {
+                eflag = false;
+                Advance(); // '+' and '-' may follow 'e'
             }
             Advance();
         }
@@ -362,55 +372,55 @@ private:
     }
 };
 
-class Parser {
+class JsonParser {
 public:
-    Parser() = default;
-    Parser(const std::string& str) : scanner(str) {}
-    Parser(const Scanner& scanner) : scanner(scanner) {}
+    JsonParser() = default;
+    JsonParser(const std::string& str) : scanner(str) {}
+    JsonParser(const JsonScanner& scanner) : scanner(scanner) {}
     
-    JsonElementPtr_t Parse() {
-        auto element = std::make_shared<JsonElement>();
+    JsonElement Parse() {
+        JsonElement element{};
         auto token_type = scanner.Scan();
         
         switch (token_type) {
-            case Scanner::JsonTokenType::END_OF_SOURCE:
+            case JsonScanner::JsonTokenType::END_OF_SOURCE:
                 break;
                 
-            case Scanner::JsonTokenType::BEGIN_OBJECT: {
+            case JsonScanner::JsonTokenType::BEGIN_OBJECT: {
                 auto object = ParseObject();
-                element->value(object);
+                element.value(object);
                 break;
             }
             
-            case Scanner::JsonTokenType::BEGIN_ARRAY: {
+            case JsonScanner::JsonTokenType::BEGIN_ARRAY: {
                 auto array = ParseArray();
-                element->value(array);
+                element.value(array);
                 break;
             }
             
-            case Scanner::JsonTokenType::VALUE_STRING: {
+            case JsonScanner::JsonTokenType::VALUE_STRING: {
                 auto str = scanner.GetStringValue();
-                element->value(str);
+                element.value(str);
                 break;
             }
                 
-            case Scanner::JsonTokenType::VALUE_NUMBER: {
+            case JsonScanner::JsonTokenType::VALUE_NUMBER: {
                 auto num = scanner.GetNumberValue();
-                element->value(num);
+                element.value(num);
                 break;
             }
                 
-            case Scanner::JsonTokenType::LITERAL_TRUE: {
-                element->value(true);
+            case JsonScanner::JsonTokenType::LITERAL_TRUE: {
+                element.value(true);
                 break;
             }
                 
-            case Scanner::JsonTokenType::LITERAL_FALSE: {
-                element->value(false);
+            case JsonScanner::JsonTokenType::LITERAL_FALSE: {
+                element.value(false);
                 break;
             }
                 
-            case Scanner::JsonTokenType::LITERAL_NULL: {
+            case JsonScanner::JsonTokenType::LITERAL_NULL: {
                 break;
             }
             
@@ -422,33 +432,33 @@ public:
     }
     
 private:
-    Scanner scanner;
+    JsonScanner scanner;
     
-    JsonObjectPtr_t ParseObject() {
-        auto rst = std::make_shared<JsonObject>();
+    JsonObject ParseObject() {
+        JsonObject rst{};
         
         auto next = scanner.Scan();
-        if (next == Scanner::JsonTokenType::END_OBJECT) {
+        if (next == JsonScanner::JsonTokenType::END_OBJECT) {
             return rst;
         }
         scanner.Rollback();
         
         while (true) {
             next = scanner.Scan();
-            if (next != Scanner::JsonTokenType::VALUE_STRING) {
+            if (next != JsonScanner::JsonTokenType::VALUE_STRING) {
                 ERROR("Key must be string!");
             }
             std::string key = scanner.GetStringValue();
             next = scanner.Scan();
-            if (next != Scanner::JsonTokenType::NAME_SEPARATOR) {
+            if (next != JsonScanner::JsonTokenType::NAME_SEPARATOR) {
                 ERROR("Expected ':'!");
             }
-            rst->insert({key, Parse()});
+            rst.insert({key, Parse()});
             next = scanner.Scan();
-            if (next == Scanner::JsonTokenType::END_OBJECT) {
+            if (next == JsonScanner::JsonTokenType::END_OBJECT) {
                 break;
             }
-            if (next != Scanner::JsonTokenType::VALUE_SEPARATOR) {
+            if (next != JsonScanner::JsonTokenType::VALUE_SEPARATOR) {
                 ERROR("Expected ','!");
             }
         }
@@ -456,24 +466,24 @@ private:
         return rst;
     }
     
-    JsonArrayPtr_t ParseArray() {
-        auto rst = std::make_shared<JsonArray>();
+    JsonArray ParseArray() {
+        JsonArray rst;
         
         auto next = scanner.Scan();
-        if (next == Scanner::JsonTokenType::END_ARRAY) {
+        if (next == JsonScanner::JsonTokenType::END_ARRAY) {
             return rst;
         }
         scanner.Rollback();
         
         while (true) {
-            rst->push_back(Parse());
+            rst.push_back(Parse());
             next = scanner.Scan();
             
-            if (next == Scanner::JsonTokenType::END_ARRAY) {
+            if (next == JsonScanner::JsonTokenType::END_ARRAY) {
                 break;
             }
             
-            if (next != Scanner::JsonTokenType::VALUE_SEPARATOR) {
+            if (next != JsonScanner::JsonTokenType::VALUE_SEPARATOR) {
                 ERROR("Expected ','!");
             }
         }
@@ -482,59 +492,69 @@ private:
     }
 };
 
-class Json {
-public:
-    Json() : element(std::make_shared<JsonElement>(std::make_shared<JsonObject>())) {}
-    Json(JsonElementPtr_t element) : element(element) {}
-    template<class T> Json(T arg) : element(std::make_shared<JsonElement>(arg)) {}
-    
-    static Json makeArray() {return std::make_shared<JsonArray>();}
+struct Json {
+    Json() : element(JsonObject{}) {}
+    Json(JsonElement element) : element(element) {}
+    template<class T> Json(T arg) : element(JsonElement{arg}) {}
 
-    JsonElement& operator[](size_t index) const {
-        if (element->GetType() != JsonElement::Type::JSON_ARRAY) {
+    static Json makeObject() {return {};} // construct as an object defaultly
+
+    template <class...Args, 
+              class = std::enable_if_t<std::disjunction_v<std::is_constructible<JsonElement, Args>...>>>
+    static Json makeArray(Args...args) {return JsonArray{JsonElement{args}...};}
+
+    JsonElement& operator[](size_t index) {
+        if (element.GetType() != JsonElement::Type::JSON_ARRAY) {
             ERROR("Element isn't an array!");
         }
-        return *(*element->AsArray())[index];
+        return element.AsArray()[index];
+    }
+    const JsonElement& operator[](size_t index) const {
+        if (element.GetType() != JsonElement::Type::JSON_ARRAY) {
+            ERROR("Element isn't an array!");
+        }
+        return element.AsArray()[index];
     }
     
-    JsonElement& operator[](const std::string& key) const {
-        if (element->GetType() != JsonElement::Type::JSON_OBJECT) {
+    JsonElement& operator[](const std::string& key) {
+        if (element.GetType() != JsonElement::Type::JSON_OBJECT) {
             ERROR("Element isn't an object!");
         }
-        if (element->AsObject()->count(key)) {
-            return *(*element->AsObject())[key];
-        } else {
-            auto e = std::make_shared<JsonElement>();
-            element->AsObject()->insert({key, e});
-            return *e;
+        return element.AsObject()[key];
+    }
+    const JsonElement& operator[](const std::string& key) const {
+        if (element.GetType() != JsonElement::Type::JSON_OBJECT) {
+            ERROR("Element isn't an object!");
         }
+        return element.AsObject().at(key); // if key isn't existed, it may cause an exception
     }
     
-    template<class T>
+    template <class T, 
+              class = std::enable_if_t<std::is_constructible_v<JsonElement, T>>>
     void PushToArray(T arg) {
-        if (element->GetType() != JsonElement::Type::JSON_ARRAY) {
+        if (element.GetType() != JsonElement::Type::JSON_ARRAY) {
             ERROR("Element isn't an array!");
         }
-        element->AsArray()->push_back(std::make_shared<JsonElement>(arg));
+        element.AsArray().push_back(JsonElement{arg});
     }
 
     void PushToArray(const Json& j) {
-        if (element->GetType() != JsonElement::Type::JSON_ARRAY) {
+        if (element.GetType() != JsonElement::Type::JSON_ARRAY) {
             ERROR("Element isn't an array!");
         }
-        element->AsArray()->push_back(std::make_shared<JsonElement>((JsonElement&)j));
-    }
-
-    operator JsonElement&() const {
-        return *element;
+        element.AsArray().push_back(j.element);
     }
     
     std::string Str() const {
-        return element->Dumps();
+        return element.Dumps();
     }
+
+    operator JsonElement&() {return element;}
     
-private:
-    JsonElementPtr_t element;
+    JsonElement element;
+
 };
+
+#undef ERROR
 
 }

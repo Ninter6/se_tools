@@ -1,3 +1,9 @@
+/*
+ * @Author: Ninter6 mc525740@outlook.com
+ * @Date: 2023-08-22 18:55:03
+ * @LastEditors: Ninter6
+ * @LastEditTime: 2024-01-06 17:42:37
+ */
 //
 //  se_tools.h
 //  nova
@@ -16,16 +22,6 @@
 #include "sebase64.h"
 #include "secompress.h"
 #include "seargs.h"
-
-#ifdef NDEGUG
-
-#define DEBUG_LOG
-
-#else
-
-#define DEBUG_LOG(e) do{std::cerr<<e<<std::endl;}while(0)
-
-#endif
 
 #define LOOP(n) for (int i = 0; i < n; i++)
 #define LOOPX(n, x) for (int x = 0; x < n; x++)
