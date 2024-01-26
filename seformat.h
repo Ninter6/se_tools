@@ -192,9 +192,6 @@ struct fmt_opt {
             case '+':
                 showpos = true;
                 break;
-            case '-':
-                showpos = false;
-                break;
             case '#':
                 type = cv_type::integer;
                 read_radix(fmt.back());

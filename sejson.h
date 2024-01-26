@@ -31,10 +31,10 @@ public:
     
     JsonElement() = default;
 
-    JsonElement(JsonObject value_object) {
+    JsonElement(const JsonObject& value_object) {
         value(value_object);
     }
-    JsonElement(JsonArray value_array) {
+    JsonElement(const JsonArray& value_array) {
         value(value_array);
     }
     JsonElement(const char* value_string) {
