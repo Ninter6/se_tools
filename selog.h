@@ -2,7 +2,7 @@
  * @Author: Ninter6 mc525740@outlook.com
  * @Date: 2023-11-17 22:33:05
  * @LastEditors: Ninter6
- * @LastEditTime: 2024-02-03 03:14:34
+ * @LastEditTime: 2024-02-03 03:33:09
  */
 #pragma once
 
@@ -147,9 +147,4 @@ void time_log(std::string_view title, std::string_view fmt, Args...args) {
 }
 
 #undef FMT
-
-#ifdef NDEGUG
-#define     DEBUG_LOG
-#else
-#define     DEBUG_LOG(e) do{std::cerr<<e<<std::endl;}while(0)
-#endif
+#undef FOREACH_LOG_LEVEL
