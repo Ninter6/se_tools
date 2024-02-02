@@ -1,6 +1,14 @@
+/*
+ * @Author: Ninter6 mc525740@outlook.com
+ * @Date: 2023-11-17 22:33:05
+ * @LastEditors: Ninter6
+ * @LastEditTime: 2024-02-03 03:14:34
+ */
 #pragma once
 
+#include <chrono>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <cassert>
 #include <source_location>
@@ -10,39 +18,6 @@
 #define FMT st::format
 
 namespace st::log {
-
-namespace {
-std::ostream* op_stream = &std::cout;
-} // global variable
-
-inline void open_file(const std::string& filename) {
-    if (op_stream != &std::cout) delete op_stream;
-    op_stream = new std::ofstream(filename);
-}
-
-struct printer {
-    constexpr printer() = default;
-    template <class...Args>
-    void operator()(Args...args) const {
-        (((*op_stream) << FMT("{}", args)), ...);
-        std::endl(std::cout);
-    }
-};
-constexpr printer print;
-
-template <class T>
-struct with_source_localtion {
-    template <class U, 
-              class = std::enable_if_t<std::is_constructible_v<T, U>>>
-    constexpr with_source_localtion(U inner, std::source_location loc = std::source_location::current())
-    : inner(std::forward<U>(inner)), location(loc) {}
-
-    constexpr T& get() {return inner;}
-    constexpr const T& get() const {return inner;}
-    
-    T inner;
-    std::source_location location;
-};
 
 #define FOREACH_LOG_LEVEL(f) \
     f(trace) \
@@ -69,19 +44,103 @@ constexpr const char* log_level_name(log_level lev) {
 #undef _func
 }
 
+namespace {
+std::ostream* op_stream = &std::cout;
+
+#ifdef NDEGUG
+log_level min_lev = log_level::info;
+#else 
+log_level min_lev = log_level::trace;
+#endif
+
+std::string time_format = "[ %x - %X ]:";
+} // global variable
+
+inline void set_min_Level(log_level min) {
+    min_lev = min;
+}
+inline log_level get_min_Level() {
+    return min_lev;
+}
+
+inline void set_time_format(const std::string& tfmt) {
+    time_format = tfmt;
+}
+
+inline void open_file(const std::string& filename) {
+    if (op_stream != &std::cout) delete op_stream;
+    op_stream = new std::ofstream(filename);
+}
+
+inline void use_stdout() {
+    if (op_stream == &std::cout) return;
+    delete op_stream;
+    op_stream = &std::cout;
+}
+
+struct printer {
+    constexpr printer(const char* el) : el(el) {}
+    template <class...Args>
+    void operator()(std::string_view fmt, Args...args) const {
+        (*op_stream) << FMT(fmt, std::forward<Args>(args)...) << el;
+    }
+    void operator()(std::string_view str) const {
+        (*op_stream) << str << el;
+    }
+    const char* el;
+};
+constexpr printer print{""};
+constexpr printer print_ln{"\n"};
+constexpr printer print_tab{"\n\t"};
+
+template <class T>
+struct with_source_localtion {
+    template <class U, 
+              class = std::enable_if_t<std::is_constructible_v<T, U>>>
+    constexpr with_source_localtion(U inner, std::source_location loc = std::source_location::current())
+    : inner(std::forward<U>(inner)), location(loc) {}
+
+    constexpr T& get() {return inner;}
+    constexpr const T& get() const {return inner;}
+    
+    T inner;
+    std::source_location location;
+};
+
 template <class...Args>
-void titled_log(const std::string& title, Args...args) {
-    print('['+title+"]: ", std::forward<Args>(args)...);
+void titled_log(std::string_view title, std::string_view fmt, Args...args) {
+    auto fmt_str = "[{}]: " + std::string(fmt.data(), fmt.size());
+    print_ln(fmt_str, title, std::forward<Args>(args)...);
 }
 
 template <class...Args>
-void location_log(with_source_localtion<std::string_view> title, Args...args) {
-    print(FMT("{}:{}: {}:", title.location.file_name(), title.location.line(), title.get()));
-    print(args...);
+void location_log(with_source_localtion<std::string_view> title, std::string_view fmt, Args...args) {
+    print_tab("{}:{}:", title.location.file_name(), title.location.line());
+    titled_log(title.get(), fmt, std::forward<Args>(args)...);
+}
+
+template <class...Args>
+void location_log(with_source_localtion<log_level> lev, std::string_view fmt, Args...args) {
+    if (lev.get() < min_lev) return;
+    print_tab("{}:{}:", lev.location.file_name(), lev.location.line());
+    titled_log(log_level_name(lev.get()), fmt, std::forward<Args>(args)...);
+}
+
+template <class...Args>
+void time_log(std::string_view title, std::string_view fmt, Args...args) {
+    auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    auto tm = std::localtime(&now);
+    (*op_stream) << std::put_time(tm, time_format.c_str()) << "\n\t";
+    titled_log(title, fmt, std::forward<Args>(args)...);
 }
 
 #define _func(x) template <class...Args> \
-    void log_##x(Args...args) {titled_log(#x, std::forward<Args>(args)...);}
+    void log_##x(std::string_view fmt, Args...args) {if (log_level::x < min_lev) return; titled_log(#x, fmt, std::forward<Args>(args)...);}
+    FOREACH_LOG_LEVEL(_func)
+#undef _func
+
+#define _func(x) template <class...Args> \
+    void location_##x(std::string_view fmt, Args...args) {location_log(log_level::x, fmt, std::forward<Args>(args)...);}
     FOREACH_LOG_LEVEL(_func)
 #undef _func
 

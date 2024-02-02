@@ -2,7 +2,7 @@
  * @Author: Ninter6 mc525740@outlook.com
  * @Date: 2023-10-21 13:21:34
  * @LastEditors: Ninter6
- * @LastEditTime: 2024-01-13 23:58:17
+ * @LastEditTime: 2024-02-03 02:50:55
  */
 #pragma once
 
@@ -152,7 +152,7 @@ ST_CFUNC long stod(std::string_view str, radix rdx) {
 }
 
 template <class T, class = std::enable_if_t<std::is_floating_point_v<T>>>
-constexpr std::string ftos(T value, uint32_t pre) {
+ST_CFUNC std::string ftos(T value, uint32_t pre) {
     std::string result;
     if (value < 0) {
         result.push_back('-');
@@ -174,6 +174,17 @@ constexpr std::string ftos(T value, uint32_t pre) {
     }
 
     return result;
+}
+
+ST_CFUNC std::string replace(std::string_view str, std::string_view r, std::string_view t) {
+    std::string res;
+    while (!str.empty()) {
+        auto p = str.find(r);
+        res.append(str.begin(), str.begin() + p);
+        if (p != str.size()) res.append(t.begin(), t.end());
+        str.remove_prefix(p + r.size());
+    }
+    return res;
 }
 
 struct fmt_opt {
@@ -295,19 +306,47 @@ public:
         parse_context({fmt.data(), fmt.size()});
     }
 
-    std::string operator()(auto&&... args) noexcept {
+    /**
+     * this function is disposable
+     */
+    std::string execute(auto&&... args) {
         parse(std::index_sequence_for<decltype(args)...>{},
               std::forward<decltype(args)>(args)...);
         return std::accumulate(context.begin(), context.end(), std::string{});
     }
 
+    std::string operator()(auto&&... args) const {
+        auto context_backup = context;
+        parse(std::index_sequence_for<decltype(args)...>{},
+              std::forward<decltype(args)>(args)...);
+        context.swap(context_backup);
+        return std::accumulate(context_backup.begin(), context_backup.end(), std::string{});
+    }
+
+    template <class array_t>
+    std::string parse_array(array_t&& array) const {
+        auto context_backup = context;
+        for (size_t i = 0; auto&& f : array)
+            parse_each(i++, std::forward<decltype(f)>(f));
+        context.swap(context_backup);
+        return std::accumulate(context_backup.begin(), context_backup.end(), std::string{});
+    }
+
     template<class...Args, size_t...I>
-    void parse(std::index_sequence<I...>, Args&&... args) {
+    void parse(std::index_sequence<I...>, Args&&... args) const {
         ((parse_each(I, std::forward<Args>(args))), ...);
     }
 
-public:
-    std::vector<std::string> context;
+    size_t num_args() const {
+        size_t n = 0;
+        for (const auto& [i, _] : holders)
+            if (i + 1 > n)
+                n = i + 1;
+        return n;
+    }
+
+private:
+    mutable std::vector<std::string> context;
     std::unordered_multimap<size_t/*index*/, size_t/*pos of context*/> holders;
 
 private:
@@ -345,7 +384,7 @@ private:
     }
 
     template <class T>
-    void parse_each(size_t I, T&& arg) {
+    void parse_each(size_t I, T&& arg) const {
         auto [b, e] = holders.equal_range(I);
         for (auto it = b; it != e; ++it) {
             auto& str = context[it->second];
@@ -353,25 +392,29 @@ private:
             if (auto fi = fmt.find(':'); fi + 1 < fmt.size())
                  fmt = fmt.substr(fi + 1);
             else fmt = {};
-            str = Formatter<
-#if __cplusplus > 201703L
-                std::remove_cvref_t<T>
-#else
-                std::__remove_cvref_t<T> // remove_cvref_t for C++11
-#endif
-            >{fmt}(std::forward<T>(arg));
+            str = Formatter<std::remove_cvref_t<T>>{fmt}(std::forward<T>(arg));
         }
     }
 };
 
+struct OneOffFormatParser {
+    OneOffFormatParser(std::string_view fmt) : fmt(fmt) {}
+
+    std::string operator()(auto&&... args) {
+        return fmt.execute(std::forward<decltype(args)>(args)...);
+    }
+
+    FormatParser fmt;
+};
+
 auto format(std::string_view fmt_str, auto&&... var) {
-    FormatParser parser{fmt_str};
+    OneOffFormatParser parser{fmt_str};
     return parser(std::forward<decltype(var)>(var)...);
 }
 
 namespace format_literal {
     inline auto operator""_f(const char* cstr, size_t size) {
-        return FormatParser{{cstr, size}};
+        return OneOffFormatParser{{cstr, size}};
     }
 }
 
@@ -417,8 +460,14 @@ struct Formatter<char> {
     SPRC_ fmt_opt opt;
 };
 
+template <class T, class = void>
+struct is_string : std::false_type {};
+
 template <class T>
-struct Formatter<T, std::enable_if_t<std::is_constructible_v<std::string_view, T>>> {
+struct is_string<T, std::enable_if_t<std::is_constructible_v<std::string_view, T>>> : std::true_type {};
+
+template <class T>
+struct Formatter<T, std::enable_if_t<is_string<T>::value>> {
     Formatter(std::string_view fmt) : opt(fmt) {};
     std::string operator()(std::string_view str) {return SPRC_ str_align(std::string(opt.width, opt.placeholder), str, opt.align);}
 private:
@@ -474,7 +523,7 @@ private:
 
 };
 
-#define _to_string(x) FormatParser{"{}"}((x));
+#define _to_string(x) Formatter<std::remove_cvref_t<decltype(x)>>{{}}((x));
 
 template <class T1, class T2>
 struct Formatter<std::pair<T1, T2>> {
@@ -515,23 +564,17 @@ private:
 };
 
 template <class T, class = void>
-struct _is_string : std::false_type {};
+struct is_iterable : std::false_type {};
 
 template <class T>
-struct _is_string<T, std::enable_if_t<std::is_constructible_v<std::string_view, T>>> : std::true_type {};
-
-template <class T, class = void>
-struct _is_iterable : std::false_type {};
-
-template <class T>
-struct _is_iterable<T, typename std::iterator_traits<decltype(std::begin(std::declval<T&>()))>::value_type> : std::true_type {};
+struct is_iterable<T, typename std::iterator_traits<decltype(std::begin(std::declval<T&>()))>::value_type> : std::true_type {};
 
 template <class T, size_t N>
-struct _is_iterable<T[N]> : std::true_type {};
+struct is_iterable<T[N]> : std::true_type {};
 
 template <class T>
 struct is_formatable_range {
-    static constexpr bool value = !_is_string<T>::value && _is_iterable<T>::value;
+    static constexpr bool value = !is_string<T>::value && is_iterable<T>::value;
 };
 
 template <class T>

@@ -2,7 +2,7 @@
  * @Author: Ninter6 mc525740@outlook.com
  * @Date: 2023-08-22 16:35:10
  * @LastEditors: Ninter6
- * @LastEditTime: 2024-01-14 12:11:15
+ * @LastEditTime: 2024-02-03 00:47:44
  */
 #pragma once
 
@@ -22,8 +22,9 @@ public:
     }
 
     auto Tick() {
-        auto past = std::chrono::high_resolution_clock::now() - lastTick;
-        lastTick = std::chrono::high_resolution_clock::now();
+        auto now = std::chrono::high_resolution_clock::now();
+        auto past = now - lastTick;
+        lastTick = now;
         return past;
     }
 
