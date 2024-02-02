@@ -115,15 +115,23 @@ void titled_log(std::string_view title, std::string_view fmt, Args...args) {
 
 template <class...Args>
 void location_log(with_source_localtion<std::string_view> title, std::string_view fmt, Args...args) {
-    print_tab("{}:{}:", title.location.file_name(), title.location.line());
+    print_tab("{}:{} in {}:", title.location.file_name(), title.location.line(), title.location.function_name());
     titled_log(title.get(), fmt, std::forward<Args>(args)...);
 }
 
 template <class...Args>
 void location_log(with_source_localtion<log_level> lev, std::string_view fmt, Args...args) {
     if (lev.get() < min_lev) return;
-    print_tab("{}:{}:", lev.location.file_name(), lev.location.line());
+    print_tab("{}:{} in {}:", lev.location.file_name(), lev.location.line(), lev.location.function_name());
     titled_log(log_level_name(lev.get()), fmt, std::forward<Args>(args)...);
+}
+
+template <class...Args>
+void time_log(log_level lev, std::string_view fmt, Args...args) {
+    auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    auto tm = std::localtime(&now);
+    (*op_stream) << std::put_time(tm, time_format.c_str()) << "\n\t";
+    titled_log(log_level_name(lev), fmt, std::forward<Args>(args)...);
 }
 
 template <class...Args>
@@ -141,6 +149,11 @@ void time_log(std::string_view title, std::string_view fmt, Args...args) {
 
 #define _func(x) template <class...Args> \
     void location_##x(std::string_view fmt, Args...args) {location_log(log_level::x, fmt, std::forward<Args>(args)...);}
+    FOREACH_LOG_LEVEL(_func)
+#undef _func
+
+#define _func(x) template <class...Args> \
+    void time_##x(std::string_view fmt, Args...args) {time_log(log_level::x, fmt, std::forward<Args>(args)...);}
     FOREACH_LOG_LEVEL(_func)
 #undef _func
 
