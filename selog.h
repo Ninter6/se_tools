@@ -2,7 +2,7 @@
  * @Author: Ninter6 mc525740@outlook.com
  * @Date: 2023-11-17 22:33:05
  * @LastEditors: Ninter6
- * @LastEditTime: 2024-02-03 03:33:09
+ * @LastEditTime: 2024-02-03 13:57:43
  */
 #pragma once
 
@@ -34,8 +34,23 @@ enum class log_level {
 #undef _func
 };
 
+#ifndef SELOG_DISABLE_ANSI
+#define     LEVEL_COLOR_trace       "\E[37m"
+#define     LEVEL_COLOR_debug       "\E[35m"
+#define     LEVEL_COLOR_info        "\E[32m"
+#define     LEVEL_COLOR_critical    "\E[34m"
+#define     LEVEL_COLOR_warning     "\E[33m"
+#define     LEVEL_COLOR_error       "\E[31m"
+#define     LEVEL_COLOR_fatal       "\E[31;1m"
+#define     LEVEL_COLOR_CLEAR       "\E[m"
+#define     LEVEL_COLOR(x)          LEVEL_COLOR_##x
+#else
+#define     LEVEL_COLOR_CLEAR
+#define     LEVEL_COLOR(x)
+#endif
+
 constexpr const char* log_level_name(log_level lev) {
-#define _func(x) case log_level:: x : return #x;
+#define _func(x) case log_level:: x : return LEVEL_COLOR(x) #x LEVEL_COLOR_CLEAR;
     switch (lev) {
     FOREACH_LOG_LEVEL(_func)
     default:
@@ -127,14 +142,6 @@ void location_log(with_source_localtion<log_level> lev, std::string_view fmt, Ar
 }
 
 template <class...Args>
-void time_log(log_level lev, std::string_view fmt, Args...args) {
-    auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    auto tm = std::localtime(&now);
-    (*op_stream) << std::put_time(tm, time_format.c_str()) << "\n\t";
-    titled_log(log_level_name(lev), fmt, std::forward<Args>(args)...);
-}
-
-template <class...Args>
 void time_log(std::string_view title, std::string_view fmt, Args...args) {
     auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     auto tm = std::localtime(&now);
@@ -142,8 +149,17 @@ void time_log(std::string_view title, std::string_view fmt, Args...args) {
     titled_log(title, fmt, std::forward<Args>(args)...);
 }
 
+template <class...Args>
+void time_log(log_level lev, std::string_view fmt, Args...args) {
+    if (lev < min_lev) return;
+    auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    auto tm = std::localtime(&now);
+    (*op_stream) << std::put_time(tm, time_format.c_str()) << "\n\t";
+    titled_log(log_level_name(lev), fmt, std::forward<Args>(args)...);
+}
+
 #define _func(x) template <class...Args> \
-    void log_##x(std::string_view fmt, Args...args) {if (log_level::x < min_lev) return; titled_log(#x, fmt, std::forward<Args>(args)...);}
+    void log_##x(std::string_view fmt, Args...args) {if (log_level::x < min_lev) return; titled_log(log_level_name(log_level::x), fmt, std::forward<Args>(args)...);}
     FOREACH_LOG_LEVEL(_func)
 #undef _func
 
