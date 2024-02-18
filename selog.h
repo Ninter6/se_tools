@@ -2,7 +2,7 @@
  * @Author: Ninter6 mc525740@outlook.com
  * @Date: 2023-11-17 22:33:05
  * @LastEditors: Ninter6
- * @LastEditTime: 2024-02-19 03:26:28
+ * @LastEditTime: 2024-02-19 03:29:29
  */
 #pragma once
 
@@ -94,7 +94,7 @@ inline void use_stdout() {
 }
 
 struct printer {
-    constexpr printer(const std::string& el) : el(el) {}
+    constexpr printer(const char* el) : el(el) {}
     template <class...Args>
     void operator()(std::string_view fmt, Args...args) const {
         (*op_stream) << FMT(fmt, std::forward<Args>(args)...) << el;
@@ -102,7 +102,7 @@ struct printer {
     void operator()(std::string_view str) const {
         (*op_stream) << str << el;
     }
-    std::string el;
+    const char* el;
 };
 constexpr printer print{""};
 constexpr printer print_ln{"\n"};
