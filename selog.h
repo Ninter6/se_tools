@@ -2,7 +2,7 @@
  * @Author: Ninter6 mc525740@outlook.com
  * @Date: 2023-11-17 22:33:05
  * @LastEditors: Ninter6
- * @LastEditTime: 2024-02-18 02:50:32
+ * @LastEditTime: 2024-02-19 03:26:28
  */
 #pragma once
 
@@ -68,7 +68,7 @@ log_level min_lev = log_level::info;
 log_level min_lev = log_level::trace;
 #endif
 
-// std::string time_format = "[ %x - %X ]:"; // dont support yet
+std::string time_format = "[ %x - %X ]:"; // dont support yet
 } // global variable
 
 inline void set_min_Level(log_level min) {
@@ -78,9 +78,9 @@ inline log_level get_min_Level() {
     return min_lev;
 }
 
-// inline void set_time_format(const std::string& tfmt) {
-//     time_format = tfmt;
-// }
+inline void set_time_format(const std::string& tfmt) {
+    time_format = tfmt;
+}
 
 inline void open_file(const std::string& filename) {
     if (op_stream != &std::cout) delete op_stream;
@@ -143,15 +143,24 @@ void location_log(with_source_localtion<log_level> lev, std::string_view fmt, Ar
 
 template <class...Args>
 void time_log(std::string_view title, std::string_view fmt, Args...args) {
-    std::chrono::zoned_time now{std::chrono::current_zone(), std::chrono::high_resolution_clock::now()};
-    (*op_stream) << "[ " << now << " ]:" << "\n\t";
+    // std::chrono::zoned_time now{std::chrono::current_zone(), std::chrono::high_resolution_clock::now()};
+    // (*op_stream) << "[ " << now << " ]:" << "\n\t";
+    // titled_log(title, fmt, std::forward<Args>(args)...);
+    auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    auto tm = std::localtime(&now);
+    (*op_stream) << std::put_time(tm, time_format.c_str()) << "\n\t";
     titled_log(title, fmt, std::forward<Args>(args)...);
 }
 
 template <class...Args>
 void time_log(log_level lev, std::string_view fmt, Args...args) {
-    std::chrono::zoned_time now{std::chrono::current_zone(), std::chrono::high_resolution_clock::now()};
-    (*op_stream) << "[ " << now << " ]:" << "\n\t";
+    if (lev < min_lev) return;
+    // std::chrono::zoned_time now{std::chrono::current_zone(), std::chrono::high_resolution_clock::now()};
+    // (*op_stream) << "[ " << now << " ]:" << "\n\t";
+    // titled_log(log_level_name(lev), fmt, std::forward<Args>(args)...);
+    auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    auto tm = std::localtime(&now);
+    (*op_stream) << std::put_time(tm, time_format.c_str()) << "\n\t";
     titled_log(log_level_name(lev), fmt, std::forward<Args>(args)...);
 }
 
