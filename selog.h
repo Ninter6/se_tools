@@ -2,7 +2,7 @@
  * @Author: Ninter6 mc525740@outlook.com
  * @Date: 2023-11-17 22:33:05
  * @LastEditors: Ninter6
- * @LastEditTime: 2024-02-10 17:38:19
+ * @LastEditTime: 2024-02-18 02:50:32
  */
 #pragma once
 
@@ -152,7 +152,7 @@ template <class...Args>
 void time_log(log_level lev, std::string_view fmt, Args...args) {
     std::chrono::zoned_time now{std::chrono::current_zone(), std::chrono::high_resolution_clock::now()};
     (*op_stream) << "[ " << now << " ]:" << "\n\t";
-    titled_log(title, fmt, std::forward<Args>(args)...);
+    titled_log(log_level_name(lev), fmt, std::forward<Args>(args)...);
 }
 
 #define _func(x) template <class...Args> \
@@ -161,7 +161,7 @@ void time_log(log_level lev, std::string_view fmt, Args...args) {
 #undef _func
 
 #define _func(x) template <class...Args> \
-    void location_##x(std::string_view fmt, Args...args) {location_log(log_level::x, fmt, std::forward<Args>(args)...);}
+    void location_##x(with_source_localtion<std::string_view> fmt, Args...args) {location_log({log_level::x, fmt.location}, fmt.get(), std::forward<Args>(args)...);}
     FOREACH_LOG_LEVEL(_func)
 #undef _func
 
