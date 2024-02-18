@@ -2,7 +2,7 @@
  * @Author: Ninter6 mc525740@outlook.com
  * @Date: 2023-08-22 16:35:10
  * @LastEditors: Ninter6
- * @LastEditTime: 2024-02-03 00:47:44
+ * @LastEditTime: 2024-02-19 03:42:48
  */
 #pragma once
 
@@ -49,6 +49,7 @@ public:
     using duration = std::chrono::duration<double, std::chrono::seconds::period>;
 
     Countdown() = default;
+    Countdown(double seconds) : seconds(duration{seconds}) {}
     Countdown(duration seconds) : seconds(seconds) {}
 
     bool IsTimeOut() {
