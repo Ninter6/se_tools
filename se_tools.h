@@ -41,3 +41,8 @@ void hash_combine(std::size_t& seed, const T& v, const Rest&... rest) {
 
 #define FATAL_LOG(...) do{st::log::location_fatal(__VA_ARGS__); \
     std::terminate();}while(0)
+
+#define SE_STR(x) #x
+#define SE_XSTR(x) SE_STR(x)
+
+#define CREF(x) const x&
