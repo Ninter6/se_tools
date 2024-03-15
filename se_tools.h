@@ -2,7 +2,7 @@
  * @Author: Ninter6 mc525740@outlook.com
  * @Date: 2023-08-22 18:55:03
  * @LastEditors: Ninter6
- * @LastEditTime: 2024-02-03 13:08:54
+ * @LastEditTime: 2024-03-16 00:21:56
  */
 //
 //  se_tools.h
@@ -46,3 +46,6 @@ void hash_combine(std::size_t& seed, const T& v, const Rest&... rest) {
 #define SE_XSTR(x) SE_STR(x)
 
 #define CREF(x) const x&
+
+#define SE_STR(x) #x
+#define SE_XSTR(x) SE_STR(x)
