@@ -113,6 +113,25 @@ public:
         if (type != Type::JSON_BOOL) ERROR("Type of JsonElement isn't Boolean!");
         return std::get<bool>(val);
     }
+
+    bool IsNull() const {
+        return type == Type::JSON_NULL;
+    }
+    bool IsObject() const {
+        return type == Type::JSON_OBJECT;
+    }
+    bool IsArray() const {
+        return type == Type::JSON_ARRAY;
+    }
+    bool IsString() const {
+        return type == Type::JSON_STRING;
+    }
+    bool IsNumber() const {
+        return type == Type::JSON_NUMBER;
+    }
+    bool IsBool() const {
+        return type == Type::JSON_BOOL;
+    }
     
     Type GetType() const {
         return type;
@@ -495,35 +514,36 @@ private:
 struct Json {
     Json() : element(JsonObject{}) {}
     Json(JsonElement element) : element(element) {}
-    template<class T> Json(T arg) : element(JsonElement{arg}) {}
+    template<class T, class = std::enable_if_t<std::is_constructible_v<JsonElement, T>>> 
+    Json(T&& arg) : element(JsonElement{arg}) {}
 
     static Json makeObject() {return {};} // construct as an object defaultly
 
     template <class...Args, 
               class = std::enable_if_t<std::disjunction_v<std::is_constructible<JsonElement, Args>...>>>
-    static Json makeArray(Args...args) {return JsonArray{JsonElement{args}...};}
+    static Json makeArray(Args&&...args) {return JsonArray{JsonElement{args}...};}
 
     JsonElement& operator[](size_t index) {
-        if (element.GetType() != JsonElement::Type::JSON_ARRAY) {
+        if (!element.IsArray()) {
             ERROR("Element isn't an array!");
         }
         return element.AsArray()[index];
     }
     const JsonElement& operator[](size_t index) const {
-        if (element.GetType() != JsonElement::Type::JSON_ARRAY) {
+        if (!element.IsArray()) {
             ERROR("Element isn't an array!");
         }
         return element.AsArray()[index];
     }
     
     JsonElement& operator[](const std::string& key) {
-        if (element.GetType() != JsonElement::Type::JSON_OBJECT) {
+        if (!element.IsObject()) {
             ERROR("Element isn't an object!");
         }
         return element.AsObject()[key];
     }
     const JsonElement& operator[](const std::string& key) const {
-        if (element.GetType() != JsonElement::Type::JSON_OBJECT) {
+        if (!element.IsObject()) {
             ERROR("Element isn't an object!");
         }
         return element.AsObject().at(key); // if key isn't existed, it may cause an exception
@@ -532,14 +552,14 @@ struct Json {
     template <class T, 
               class = std::enable_if_t<std::is_constructible_v<JsonElement, T>>>
     void PushToArray(T arg) {
-        if (element.GetType() != JsonElement::Type::JSON_ARRAY) {
+        if (!element.IsArray()) {
             ERROR("Element isn't an array!");
         }
         element.AsArray().push_back(JsonElement{arg});
     }
 
     void PushToArray(const Json& j) {
-        if (element.GetType() != JsonElement::Type::JSON_ARRAY) {
+        if (!element.IsArray()) {
             ERROR("Element isn't an array!");
         }
         element.AsArray().push_back(j.element);
