@@ -1,229 +1,316 @@
 #pragma once
 
-#include <cctype>
+#include <cassert>
+#include <vector>
 #include <string>
 #include <memory>
-#include <vector>
 #include <sstream>
-#include <variant>
 #include <unordered_map>
 
 namespace st {
 
 #define ERROR(s) do{throw std::logic_error(s);}while(0)
 
-class JsonElement;
-using JsonObject = std::unordered_map<std::string, JsonElement>;
-using JsonArray = std::vector<JsonElement>;
+#define JSON_TYPE_NON_NULL(f) \
+    f(Object) \
+    f(Array) \
+    f(String) \
+    f(Number) \
+    f(Boolean)
+#define JSON_TYPE(f) \
+    JSON_TYPE_NON_NULL(f) \
+    f(Null)
 
-class JsonElement {
+enum class JsonType {
+#define g(x) x,
+    JSON_TYPE(g)
+#undef g
+};
+
+class Json;
+struct JsonElementBase;
+
+using JsonObject = std::unordered_map<std::string, Json>;
+using JsonArray = std::vector<Json>;
+using JsonString = std::string;
+using JsonNumber = double;
+using JsonBoolean = bool;
+
+class Json {
 public:
-    enum class Type {
-        JSON_OBJECT,
-        JSON_ARRAY,
-        JSON_STRING,
-        JSON_NUMBER,
-        JSON_BOOL,
-        JSON_NULL
-    };
+    Json();
+    Json(const Json& o);
+    Json(Json&& o) noexcept;
 
-    using Value_t = std::variant<JsonObject, JsonArray, std::string, double, bool>;
-    
-    JsonElement() = default;
+    Json& operator=(const Json& o);
+    Json& operator=(Json&& o) noexcept;
 
-    JsonElement(const JsonObject& value_object) {
-        value(value_object);
-    }
-    JsonElement(const JsonArray& value_array) {
-        value(value_array);
-    }
-    JsonElement(const char* value_string) {
-        value(std::string{value_string});
-    }
-    JsonElement(const std::string& value_string) {
-        value(value_string);
-    }
-    template <class T, class = std::enable_if_t<std::is_arithmetic_v<T>>>
-    JsonElement(T value_number) {
-        value(static_cast<double>(value_number));
-    }
-    JsonElement(bool value_bool) {
-        value(value_bool);
-    }
-    
-    void value(const JsonObject& value_object) {
-        type = Type::JSON_OBJECT;
-        val= value_object;
-    }
-    void value(const JsonArray& value_array) {
-        type = Type::JSON_ARRAY;
-        val = value_array;
-    }
-    void value(const std::string& value_string) {
-        type = Type::JSON_STRING;
-        val = value_string;
-    }
-    void value(double value_number) {
-        type = Type::JSON_NUMBER;
-        val = value_number;
-    }
-    void value(bool value_bool) {
-        type = Type::JSON_BOOL;
-        val = value_bool;
+    template<class T, class = typename std::enable_if<std::is_integral<T>::value>::type>
+    Json(T n);
+    Json(const char*);
+
+#define g(x) Json(const Json##x& v);
+    JSON_TYPE_NON_NULL(g)
+#undef g
+
+#define g(x) Json(Json##x&& v);
+    JSON_TYPE_NON_NULL(g)
+#undef g
+
+#define g(x) Json##x& as##x();
+    JSON_TYPE_NON_NULL(g)
+#undef g
+
+#define g(x) const Json##x& as##x() const;
+    JSON_TYPE_NON_NULL(g)
+#undef g
+
+#define g(x) bool is##x() const;
+    JSON_TYPE(g);
+#undef g
+
+#define g(x) static Json Make##x() {return Json(Json##x{});}
+    JSON_TYPE_NON_NULL(g)
+    static Json MakeNull() {return Json{};}
+#undef g
+
+    std::string dumps() const;
+    JsonType type() const;
+
+    Json& operator[](const std::string& k) {
+        assert(isObject() && "Element isn't an object!");
+        return asObject()[k];
     }
 
-    JsonObject& AsObject() {
-        if (type != Type::JSON_OBJECT) ERROR("Type of JsonElement isn't JsonObject!");
-        return std::get<JsonObject>(val);
-    }
-    JsonArray& AsArray() {
-        if (type != Type::JSON_ARRAY) ERROR("Type of JsonElement isn't JsonArray!");
-        return std::get<JsonArray>(val);
-    }
-    std::string& AsString() {
-        if (type != Type::JSON_STRING) ERROR("Type of JsonElement isn't String!");
-        return std::get<std::string>(val);
-    }
-    double& AsNumber() {
-        if (type != Type::JSON_NUMBER) ERROR("Type of JsonElement isn't Number!");
-        return std::get<double>(val);
-    }
-    bool& AsBool() {
-        if (type != Type::JSON_BOOL) ERROR("Type of JsonElement isn't Boolean!");
-        return std::get<bool>(val);
+    const Json& operator[](const std::string& k) const {
+        assert(isObject() && "Element isn't an object!");
+        return asObject().at(k);
     }
 
-    const JsonObject& AsObject() const {
-        if (type != Type::JSON_OBJECT) ERROR("Type of JsonElement isn't JsonObject!");
-        return std::get<JsonObject>(val);
-    }
-    const JsonArray& AsArray() const {
-        if (type != Type::JSON_ARRAY) ERROR("Type of JsonElement isn't JsonArray!");
-        return std::get<JsonArray>(val);
-    }
-    const std::string& AsString() const {
-        if (type != Type::JSON_STRING) ERROR("Type of JsonElement isn't String!");
-        return std::get<std::string>(val);
-    }
-    const double& AsNumber() const {
-        if (type != Type::JSON_NUMBER) ERROR("Type of JsonElement isn't Number!");
-        return std::get<double>(val);
-    }
-    const bool& AsBool() const {
-        if (type != Type::JSON_BOOL) ERROR("Type of JsonElement isn't Boolean!");
-        return std::get<bool>(val);
+    Json& operator[](size_t n) {
+        assert(isArray() && "Element isn't an array!");
+        return asArray()[n];
     }
 
-    bool IsNull() const {
-        return type == Type::JSON_NULL;
-    }
-    bool IsObject() const {
-        return type == Type::JSON_OBJECT;
-    }
-    bool IsArray() const {
-        return type == Type::JSON_ARRAY;
-    }
-    bool IsString() const {
-        return type == Type::JSON_STRING;
-    }
-    bool IsNumber() const {
-        return type == Type::JSON_NUMBER;
-    }
-    bool IsBool() const {
-        return type == Type::JSON_BOOL;
-    }
-    
-    Type GetType() const {
-        return type;
+    const Json& operator[](size_t n) const {
+        assert(isArray() && "Element isn't an array!");
+        return asArray()[n];
     }
 
-    std::string Dumps() const {
-      std::stringstream ss;
-      switch (type) {
-        case Type::JSON_OBJECT:
-          ss << std::get<JsonObject>(val);
-          break;
-        case Type::JSON_ARRAY:
-          ss << std::get<JsonArray>(val);
-          break;
-        case Type::JSON_STRING:
-          ss << '"' << std::get<std::string>(val) << '"';
-          break;
-        case Type::JSON_NUMBER:
-          ss << std::get<double>(val);
-          break;
-        case Type::JSON_BOOL:
-          ss << std::boolalpha << std::get<bool>(val);
-          break;
-        case Type::JSON_NULL:
-          ss << "null";
-          break;
-      }
-      return ss.str();
-    }
-
+    friend std::ostream& operator<<(std::ostream& os, const Json& json);
     friend std::ostream& operator<<(std::ostream& os, const JsonObject& object) {
-      os << "{";
-      for (auto iter = object.begin(); iter != object.end(); iter++) {
-        os << '\"' << iter->first << '\"' << ": " << iter->second.Dumps();
-        if (std::next(iter) != object.end()) {
-          os << ", ";
+        os << "{";
+        for (auto iter = object.begin(); iter != object.end(); iter++) {
+            os << '\"' << iter->first << '\"' << ": " << iter->second;
+            if (std::next(iter) != object.end()) {
+                os << ", ";
+            }
         }
-      }
-      os << "}";
-      return os;
+        os << "}";
+        return os;
     }
-
     friend std::ostream& operator<<(std::ostream& os, const JsonArray& array) {
-      os << "[";
-      for (size_t i = 0; i < array.size(); i++) {
-        os << array[i].Dumps();
-        if (i != array.size() - 1) {
-          os << ", ";
+        os << "[";
+        for (size_t i = 0; i < array.size(); i++) {
+            os << array[i];
+            if (i != array.size() - 1) {
+                os << ", ";
+            }
         }
-      }
-      os << "]";
-      return os;
+        os << "]";
+        return os;
     }
 
 private:
-    Type type = Type::JSON_NULL;
-    Value_t val;
+    std::unique_ptr<JsonElementBase> element;
 
 };
+
+struct JsonElementBase {
+    virtual ~JsonElementBase() = default;
+
+    [[nodiscard]] virtual JsonElementBase* clone() const = 0;
+
+#define g(x) virtual Json##x& as##x() = 0;
+    JSON_TYPE_NON_NULL(g)
+#undef g
+
+#define g(x) virtual const Json##x& as##x() const = 0;
+    JSON_TYPE_NON_NULL(g)
+#undef g
+
+#define g(x) virtual bool is##x() const = 0;
+    JSON_TYPE(g);
+#undef g
+
+    [[nodiscard]] virtual std::string dumps() const = 0;
+    [[nodiscard]] virtual JsonType type() const = 0;
+
+};
+
+namespace Impl {
+
+struct JsonElement : public JsonElementBase {
+#define g(x) virtual Json##x& as##x() {ERROR("Call 'asXXX()' with wrong type!");}
+    JSON_TYPE_NON_NULL(g)
+#undef g
+
+#define g(x) virtual const Json##x& as##x() const {ERROR("Call 'asXXX()' with wrong type!");}
+    JSON_TYPE_NON_NULL(g)
+#undef g
+
+#define g(x) virtual bool is##x() const {return false;}
+    JSON_TYPE(g);
+#undef g
+
+};
+
+#define BEGIN_ELEMENT(n) \
+    struct JsonElement##n : public JsonElement { \
+        Json##n val; \
+        JsonElement##n() = default; \
+        JsonElement##n(const Json##n& val) : val(val) {} \
+        JsonElement##n(Json##n&& val) : val(std::move(val)) {} \
+        JsonElementBase* clone() const override {return new JsonElement##n(val);} \
+        Json##n& as##n() override {return val;} \
+        const Json##n& as##n() const override {return val;} \
+        bool is##n() const override {return true;} \
+        JsonType type() const override {return JsonType:: n;}
+#define END_ELEMENT() };
+
+BEGIN_ELEMENT(Object)
+    std::string dumps() const override {
+        std::stringstream ss;
+        ss << val;
+        return ss.str();
+    }
+END_ELEMENT()
+
+BEGIN_ELEMENT(Array)
+    virtual std::string dumps() const override {
+        std::stringstream ss;
+        ss << val;
+        return ss.str();
+    }
+END_ELEMENT()
+
+BEGIN_ELEMENT(String)
+    std::string dumps() const override {
+        return '"' + val + '"';
+    }
+END_ELEMENT()
+
+BEGIN_ELEMENT(Number)
+    std::string dumps() const override {
+        auto s = std::to_string(val);
+        if (s.find('.') < s.size()) {
+            auto n = s.find_last_not_of('0');
+            s.erase(s[n-1] == '.' ? n-1 : n);
+        }
+        return s;
+    }
+END_ELEMENT()
+
+BEGIN_ELEMENT(Boolean)
+    std::string dumps() const override {
+        return val ? "true" : "false";
+    }
+END_ELEMENT()
+
+struct JsonElementNull : public JsonElement {
+    JsonElementNull() = default;
+    JsonElementBase* clone() const override {return new JsonElementNull();}
+    bool isNull() const override {return true;}
+    JsonType type() const override {return JsonType::Null;}
+    std::string dumps() const override {return "null";}
+};
+
+#undef BEGIN_ELEMENT
+#undef END_ELEMENT
+
+}
+
+inline Json::Json() : element(std::make_unique<Impl::JsonElementNull>()) {}
+inline Json::Json(const Json& o) : element(o.element->clone()) {}
+inline Json::Json(Json&& o) noexcept : element(std::move(o.element)) {}
+
+inline Json& Json::operator=(const Json& o) {
+    element.reset(o.element->clone());
+    return *this;
+}
+inline Json& Json::operator=(Json&& o) noexcept {
+    element = std::move(o.element);
+    return *this;
+}
+
+template<class T, class>
+inline Json::Json(T n) : element(std::make_unique<Impl::JsonElementNumber>(static_cast<double>(n))) {}
+inline Json::Json(const char* s) : element(std::make_unique<Impl::JsonElementString>(s)) {}
+
+#define g(x) inline Json::Json(const Json##x& v) : element(std::make_unique<Impl::JsonElement##x>(v)) {}
+    JSON_TYPE_NON_NULL(g)
+#undef g
+
+#define g(x) inline Json::Json(Json##x&& v) : element(std::make_unique<Impl::JsonElement##x>(std::move(v))) {}
+    JSON_TYPE_NON_NULL(g)
+#undef g
+
+#define g(x) inline Json##x& Json::as##x() {return element->as##x();}
+    JSON_TYPE_NON_NULL(g)
+#undef g
+
+#define g(x) inline const Json##x& Json::as##x() const {return element->as##x();}
+    JSON_TYPE_NON_NULL(g)
+#undef g
+
+#define g(x) inline bool Json::is##x() const {return element->is##x();}
+    JSON_TYPE(g)
+#undef g
+
+inline std::string Json::dumps() const {
+    return element->dumps();
+}
+
+inline JsonType Json::type() const {
+    return element->type();
+}
+
+inline std::ostream& operator<<(std::ostream& os, const Json& json) {
+    return os << json.element->dumps();
+}
 
 class JsonScanner {
 public:
     JsonScanner() = default;
     JsonScanner(const std::string& source) : src(source) {}
-    
+
     enum class JsonTokenType {
         BEGIN_OBJECT, // {
         END_OBJECT, // }
-        
+
         VALUE_SEPARATOR, // ,
         NAME_SEPARATOR, // :
-        
+
         VALUE_STRING, // "string"
         VALUE_NUMBER, // 1, 2, ...
-        
+
         LITERAL_TRUE, // true
         LITERAL_FALSE, // false
         LITERAL_NULL, // null
-        
+
         BEGIN_ARRAY, // [
         END_ARRAY, // ]
-        
+
         END_OF_SOURCE // EOF
     };
-    
+
     JsonTokenType Scan() {
         if (IsAtEnd()) {
             return JsonTokenType::END_OF_SOURCE;
         }
-        
+
         prev_pos = current;
-        
+
         char c = Advance();
         switch (c) {
             case '{':
@@ -250,7 +337,7 @@ public:
             case '"':
                 ScanString();
                 return JsonTokenType::VALUE_STRING;
-                
+
             default:
                 if (std::isdigit(c) || c == '+' || c == '-') {
                     ScanNumber();
@@ -263,45 +350,45 @@ public:
                 break;
         }
     }
-    
+
     void Rollback() {
         current = prev_pos;
     }
-    
-    std::string GetStringValue() {
+
+    JsonString GetStringValue() {
         return value_string;
     }
-    
-    double GetNumberValue() {
+
+    JsonNumber GetNumberValue() {
         return value_number;
     }
-    
+
 private:
     std::string src; // json source
     size_t current = 0; // current handling pos
     size_t prev_pos = 0; // previous handling pos
-    std::string value_string;
-    double value_number;
-    
+    JsonString value_string;
+    JsonNumber value_number;
+
     bool IsAtEnd() {
         return current >= src.size();
     }
-    
+
     char Advance() {
         if (current < src.size()) return src[current++];
         else return 0;
     }
-    
+
     char Peek() {
         if (current < src.size()) return src[current];
         else return 0;
     }
-    
+
     char PeekNext() {
         if (current < src.size()) return src[current + 1];
         else return 0;
     }
-    
+
     void ScanTrue() {
         if (src.compare(current, 3, "rue") == 0) {
             current += 3;
@@ -309,7 +396,7 @@ private:
             ERROR("Scan 'true' error");
         }
     }
-    
+
     void ScanFlase() {
         if (src.compare(current, 4, "alse") == 0) {
             current += 4;
@@ -317,7 +404,7 @@ private:
             ERROR("Scan 'false' error");
         }
     }
-    
+
     void ScanNull() {
         if (src.compare(current, 3, "ull") == 0) {
             current += 3;
@@ -325,12 +412,12 @@ private:
             ERROR("Scan 'null' error");
         }
     }
-    
+
     void ScanNumber() {
         auto pos = current - 1;
-        
+
         bool dotflag = true, eflag = true;
-        
+
         while (std::isdigit(Peek()) ||
                (Peek() == '.' && dotflag) ||
                ((Peek() == 'e' || Peek() == 'E') && eflag)) {
@@ -342,10 +429,10 @@ private:
             }
             Advance();
         }
-        
+
         value_number = std::stof(src.substr(pos, current - pos));
     }
-    
+
     void ScanString() {
         std::string r;
         char c;
@@ -396,72 +483,52 @@ public:
     JsonParser() = default;
     JsonParser(const std::string& str) : scanner(str) {}
     JsonParser(const JsonScanner& scanner) : scanner(scanner) {}
-    
-    JsonElement Parse() {
-        JsonElement element{};
+
+    Json Parse() {
         auto token_type = scanner.Scan();
-        
+
         switch (token_type) {
-            case JsonScanner::JsonTokenType::END_OF_SOURCE:
-                break;
-                
-            case JsonScanner::JsonTokenType::BEGIN_OBJECT: {
-                auto object = ParseObject();
-                element.value(object);
-                break;
-            }
-            
-            case JsonScanner::JsonTokenType::BEGIN_ARRAY: {
-                auto array = ParseArray();
-                element.value(array);
-                break;
-            }
-            
+            case JsonScanner::JsonTokenType::BEGIN_OBJECT:
+                return {ParseObject()};
+
+            case JsonScanner::JsonTokenType::BEGIN_ARRAY:
+                return {ParseArray()};
+
             case JsonScanner::JsonTokenType::VALUE_STRING: {
-                auto str = scanner.GetStringValue();
-                element.value(str);
-                break;
+                const auto& str = scanner.GetStringValue();
+                return {str};
             }
-                
+
             case JsonScanner::JsonTokenType::VALUE_NUMBER: {
                 auto num = scanner.GetNumberValue();
-                element.value(num);
-                break;
+                return {num};
             }
-                
-            case JsonScanner::JsonTokenType::LITERAL_TRUE: {
-                element.value(true);
-                break;
-            }
-                
-            case JsonScanner::JsonTokenType::LITERAL_FALSE: {
-                element.value(false);
-                break;
-            }
-                
-            case JsonScanner::JsonTokenType::LITERAL_NULL: {
-                break;
-            }
-            
+
+            case JsonScanner::JsonTokenType::LITERAL_TRUE:
+                return {true};
+
+            case JsonScanner::JsonTokenType::LITERAL_FALSE:
+                return {false};
+
+            case JsonScanner::JsonTokenType::LITERAL_NULL:
+            case JsonScanner::JsonTokenType::END_OF_SOURCE:
             default:
-                break;
+                return {};
         }
-        
-        return element;
     }
-    
+
 private:
     JsonScanner scanner;
-    
+
     JsonObject ParseObject() {
         JsonObject rst{};
-        
+
         auto next = scanner.Scan();
         if (next == JsonScanner::JsonTokenType::END_OBJECT) {
             return rst;
         }
         scanner.Rollback();
-        
+
         while (true) {
             next = scanner.Scan();
             if (next != JsonScanner::JsonTokenType::VALUE_STRING) {
@@ -481,100 +548,38 @@ private:
                 ERROR("Expected ','!");
             }
         }
-        
+
         return rst;
     }
-    
+
     JsonArray ParseArray() {
         JsonArray rst;
-        
+
         auto next = scanner.Scan();
         if (next == JsonScanner::JsonTokenType::END_ARRAY) {
             return rst;
         }
         scanner.Rollback();
-        
+
         while (true) {
             rst.push_back(Parse());
             next = scanner.Scan();
-            
+
             if (next == JsonScanner::JsonTokenType::END_ARRAY) {
                 break;
             }
-            
+
             if (next != JsonScanner::JsonTokenType::VALUE_SEPARATOR) {
                 ERROR("Expected ','!");
             }
         }
-        
+
         return rst;
     }
 };
 
-struct Json {
-    Json() : element(JsonObject{}) {}
-    Json(JsonElement element) : element(element) {}
-    template<class T, class = std::enable_if_t<std::is_constructible_v<JsonElement, T>>> 
-    Json(T&& arg) : element(JsonElement{arg}) {}
-
-    static Json makeObject() {return {};} // construct as an object defaultly
-
-    template <class...Args, 
-              class = std::enable_if_t<std::disjunction_v<std::is_constructible<JsonElement, Args>...>>>
-    static Json makeArray(Args&&...args) {return JsonArray{JsonElement{args}...};}
-
-    JsonElement& operator[](size_t index) {
-        if (!element.IsArray()) {
-            ERROR("Element isn't an array!");
-        }
-        return element.AsArray()[index];
-    }
-    const JsonElement& operator[](size_t index) const {
-        if (!element.IsArray()) {
-            ERROR("Element isn't an array!");
-        }
-        return element.AsArray()[index];
-    }
-    
-    JsonElement& operator[](const std::string& key) {
-        if (!element.IsObject()) {
-            ERROR("Element isn't an object!");
-        }
-        return element.AsObject()[key];
-    }
-    const JsonElement& operator[](const std::string& key) const {
-        if (!element.IsObject()) {
-            ERROR("Element isn't an object!");
-        }
-        return element.AsObject().at(key); // if key isn't existed, it may cause an exception
-    }
-    
-    template <class T, 
-              class = std::enable_if_t<std::is_constructible_v<JsonElement, T>>>
-    void PushToArray(T arg) {
-        if (!element.IsArray()) {
-            ERROR("Element isn't an array!");
-        }
-        element.AsArray().push_back(JsonElement{arg});
-    }
-
-    void PushToArray(const Json& j) {
-        if (!element.IsArray()) {
-            ERROR("Element isn't an array!");
-        }
-        element.AsArray().push_back(j.element);
-    }
-    
-    std::string Str() const {
-        return element.Dumps();
-    }
-
-    operator JsonElement&() {return element;}
-    
-    JsonElement element;
-
-};
-
 #undef ERROR
+#undef JSON_TYPE
+#undef JSON_TYPE_NON_NULL
 
 }
