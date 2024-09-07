@@ -2,7 +2,7 @@
  * @Author: Ninter6 mc525740@outlook.com
  * @Date: 2023-10-21 13:21:34
  * @LastEditors: Ninter6
- * @LastEditTime: 2024-02-03 02:50:55
+ * @LastEditTime: 2024-05-12 00:10:35
  */
 #pragma once
 
@@ -499,6 +499,18 @@ private:
 };
 
 template <class T>
+struct Formatter<T*, std::enable_if_t<!is_string<T*>::value>> {
+    Formatter(std::string_view fmt) : opt(fmt) {}
+    std::string operator()(void* n) {
+        return SPRC_ str_align(std::string(opt.width, opt.placeholder), SPRC_ dtos((size_t)n, SPRC_ radix::hex), opt.align);
+    }
+
+private:
+    SPRC_ fmt_opt opt;
+
+};
+
+template <class T>
 struct Formatter<T, std::enable_if_t<std::is_floating_point_v<T>>> {
     Formatter(std::string_view fmt) : opt(fmt) {}
     std::string operator()(T n) {
@@ -569,8 +581,8 @@ struct is_iterable : std::false_type {};
 template <class T>
 struct is_iterable<T, typename std::iterator_traits<decltype(std::begin(std::declval<T&>()))>::value_type> : std::true_type {};
 
-template <class T, size_t N>
-struct is_iterable<T[N]> : std::true_type {};
+template <class T>
+struct is_iterable<T, std::enable_if_t<std::is_pointer_v<decltype(std::begin(std::declval<T&>()))>>> : std::true_type {};
 
 template <class T>
 struct is_formatable_range {
