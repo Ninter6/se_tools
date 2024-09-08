@@ -2,7 +2,7 @@
  * @Author: Ninter6 mc525740@outlook.com
  * @Date: 2023-10-21 13:21:34
  * @LastEditors: Ninter6
- * @LastEditTime: 2024-05-12 00:10:35
+ * @LastEditTime: 2024-09-08 09:43:04
  */
 #pragma once
 
@@ -392,7 +392,7 @@ private:
             if (auto fi = fmt.find(':'); fi + 1 < fmt.size())
                  fmt = fmt.substr(fi + 1);
             else fmt = {};
-            str = Formatter<std::remove_cvref_t<T>>{fmt}(std::forward<T>(arg));
+            str = Formatter<std::decay_t<T>>{fmt}(std::forward<T>(arg));
         }
     }
 };
@@ -535,7 +535,7 @@ private:
 
 };
 
-#define _to_string(x) Formatter<std::remove_cvref_t<decltype(x)>>{{}}((x));
+#define _to_string(x) Formatter<std::decay_t<decltype(x)>>{{}}((x));
 
 template <class T1, class T2>
 struct Formatter<std::pair<T1, T2>> {

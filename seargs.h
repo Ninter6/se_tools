@@ -75,7 +75,7 @@ struct option : public param {
         assert(name.substr(0, 2) == "--" && name.size() >= 3 &&
             "Invalid name!"
         );
-        assert(((short_name.front() == '-' && short_name.size() == 2) || !short_name.size()) &&
+        assert(((short_name.front() == '-' && short_name.size() == 2) || short_name.empty()) &&
             "Invalid short name!"
         );
     }
@@ -138,6 +138,7 @@ public:
     ArgParser& setProgramName(const std::string& name) {program_name = name;return *this;}
 
     ArgParser& setLossArgumentsCallBack(const std::function<void()>& callback) {loss_arguments_callback = callback;return *this;}
+    ArgParser& setUnkonwOptionCallBack(const std::function<void(const std::string&)>& callback) {unknow_option_call_back = callback;return *this;}
 
     void PrintUsage() const {
         std::cout << "usage: " << program_name;
@@ -228,6 +229,11 @@ public:
 
     ArgParser& AddValueOption(const std::string& name, const std::string& sname, const std::string& help) {
         options.push_back(std::make_unique<value_option>(name, sname, help));
+        return *this;
+    }
+
+    ArgParser& AddMultivalueOption(const std::string& name, const std::string& sname, const std::string& help) {
+        options.push_back(std::make_unique<multivalue_option>(name, sname, help));
         return *this;
     }
 
@@ -388,6 +394,7 @@ private:
     std::string program_name = "program_name"; // default program name
 
     std::function<void()> loss_arguments_callback = nullptr;
+    std::function<void(const std::string&)> unknow_option_call_back = nullptr;
 
     std::vector<argument> arguments;
     std::vector<named_argument> named_arguments;
@@ -419,7 +426,9 @@ private:
         auto it = std::find_if(options.begin(), options.end(), [&](std::unique_ptr<option>& p){
             return p->name == name;
         });
-        assert(it != options.end() && "Undefined option!");
+        // assert(it != options.end() && "Undefined option!");
+        if (it == options.end() && unknow_option_call_back)
+            unknow_option_call_back(name);
         return *it;
     }
 
@@ -435,7 +444,9 @@ private:
         auto it = std::find_if(options.begin(), options.end(), [&](std::unique_ptr<option>& p){
             return p->short_name.back() == sn;
         });
-        assert(it != options.end() && "Undefined option short name!");
+        // assert(it != options.end() && "Undefined option short name!");
+        if (it == options.end() && unknow_option_call_back)
+            unknow_option_call_back(std::string{"-"} + sn);
         return *it;
     }
 
