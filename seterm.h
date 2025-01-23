@@ -61,7 +61,7 @@ inline std::string readline(std::string_view title) {
 #if ST_WIN
     return std::getline(cin, buf);
 #else
-    auto nb = new NonBlockIO;
+    NonBlockIO nb{};
     int c, i=0;
     [&]{while (true) {
         while ((c = getchar()) == -1);
@@ -89,7 +89,6 @@ inline std::string readline(std::string_view title) {
         for (int j = 0; j < buf.size() - i; j++)
             std::cout.put('\b');
     }}();
-    delete nb;
     return buf;
 #endif
 }
