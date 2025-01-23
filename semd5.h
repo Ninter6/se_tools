@@ -10,6 +10,8 @@
 #define H(x, y, z) ((x) ^ (y) ^ (z))
 #define I(x, y, z) ((y) ^ ((x) | (~z)))
 
+namespace st {
+
 namespace detail {
 
 //常量ti unsigned(abs(sin(i+1))*(2pow32))
@@ -127,6 +129,8 @@ inline std::string md5(std::string_view src) {
         +  detail::changeHex(btemp)
         +  detail::changeHex(ctemp)
         +  detail::changeHex(dtemp);
+}
+
 }
 
 #undef F
