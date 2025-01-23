@@ -1,12 +1,5 @@
-/*
- * @Author: Ninter6 mc525740@outlook.com
- * @Date: 2023-08-22 18:55:03
- * @LastEditors: Ninter6
- * @LastEditTime: 2024-03-16 00:21:56
- */
 //
 //  se_tools.h
-//  nova
 //
 //  Created by Ninter6 on 2023/8/21.
 //

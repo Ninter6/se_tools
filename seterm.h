@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdio>
 #include <string>
 #include <iostream>
@@ -43,7 +45,7 @@ struct NonBlockIO {
 #endif
 };
 
-int getKey() {
+inline int getKey() {
 #ifdef ST_UNIX
     NonBlockIO nb{};
     return getchar();
@@ -53,7 +55,7 @@ int getKey() {
 #endif
 }
 
-std::string readline(std::string_view title) {
+inline std::string readline(std::string_view title) {
     std::string buf;
     std::cout << title;
 #if ST_WIN
